@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Flight Monitor</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="/frontend/dashboard.css">
+    <script src="/frontend/dashboard.js" defer></script>
+  </head>
+  <body>
+    <main class="dashboard">
+      <header class="page-header">
+        <div class="brand">Flight Monitor<span class="brand-dot" aria-hidden="true"></span></div>
+        <div class="header-actions">
+          <span class="connection-status" id="live" role="status">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span id="liveText">載入中</span>
+          </span>
+          <button class="button" id="refresh" type="button">更新</button>
+        </div>
+      </header>
+
+      <section class="route-heading" aria-label="目前航線">
+        <h1 id="routeTitle">機票追蹤</h1>
+        <p id="routeDescription"></p>
+      </section>
+
+      <section class="filters" aria-label="篩選條件">
+        <div class="field field-route">
+          <label for="route">航線與日期</label>
+          <select id="route"><option value="">載入中…</option></select>
+        </div>
+        <div class="field">
+          <label for="hours">觀察區間</label>
+          <select id="hours">
+            <option value="24">最近 24 小時</option>
+            <option value="168">最近 7 天</option>
+            <option value="0">全部資料</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="duration">飛行時間</label>
+          <select id="duration">
+            <option value="240">4 小時內</option>
+            <option value="360">6 小時內</option>
+            <option value="">不限</option>
+          </select>
+        </div>
+        <label class="checkbox-label">
+          <input id="nonstop" type="checkbox" checked>
+          只看直飛
+        </label>
+      </section>
+
+      <section class="metrics" aria-label="報價摘要">
+        <article class="metric-card metric-pink">
+          <h2>最新最低價</h2>
+          <p class="metric-value" id="currentPrice">—</p>
+          <p class="metric-detail" id="currentFlight">—</p>
+        </article>
+        <article class="metric-card metric-yellow">
+          <h2>區間最低價</h2>
+          <p class="metric-value" id="historyPrice">—</p>
+          <p class="metric-detail" id="historyTime">—</p>
+        </article>
+        <article class="metric-card metric-cream">
+          <h2>有報價班次</h2>
+          <p class="metric-value" id="quoteCount">—</p>
+          <p class="metric-detail" id="quoteNote">—</p>
+        </article>
+        <article class="metric-card metric-peach">
+          <h2>最後收集</h2>
+          <p class="metric-value" id="lastTime">—</p>
+          <p class="metric-detail" id="lastDate">—</p>
+        </article>
+      </section>
+
+      <section class="panel flights-panel" aria-labelledby="flightsTitle">
+        <div class="panel-header">
+          <div>
+            <h2 id="flightsTitle">航班報價 <span class="count" id="tableCount"></span></h2>
+            <p class="caption" id="comparisonTime"></p>
+          </div>
+          <input class="search" id="search" type="search" placeholder="搜尋航空公司" aria-label="搜尋航空公司">
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">航空公司</th>
+                <th scope="col">出發 → 抵達</th>
+                <th scope="col">飛行時間</th>
+                <th scope="col">最新票價</th>
+                <th scope="col">較上一輪</th>
+                <th scope="col">區間最低</th>
+                <th scope="col"><span class="visually-hidden">詳細資料</span></th>
+              </tr>
+            </thead>
+            <tbody id="flightTable"></tbody>
+          </table>
+          <div class="empty-state" id="tableEmpty" hidden>沒有符合條件的航班</div>
+        </div>
+      </section>
+
+      <section class="charts" aria-label="價格走勢">
+        <article class="panel chart-panel">
+          <div class="panel-header">
+            <h2>航線最低價</h2>
+            <span class="caption" id="historyCount"></span>
+          </div>
+          <div class="chart" id="routeChart"></div>
+          <p class="chart-caption">每輪最低報價 · TWD</p>
+        </article>
+        <article class="panel chart-panel">
+          <div class="panel-header">
+            <h2>班次走勢</h2>
+            <label class="visually-hidden" for="flightSelect">選擇班次</label>
+            <select id="flightSelect" class="flight-select"></select>
+          </div>
+          <div class="chart" id="flightChart"></div>
+          <div class="flight-range" id="flightRange"></div>
+        </article>
+      </section>
+
+      <footer class="page-footer">
+        <div class="footer-meta">
+          <span>臺北時間 · TWD</span>
+          <span id="renderTime"></span>
+        </div>
+        <div id="alerts" class="status-notes" aria-live="polite"></div>
+        <details class="collection-details">
+          <summary id="qualityTitle">收集紀錄</summary>
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th>查詢</th><th>時間</th><th>狀態</th><th>訊息</th></tr></thead>
+              <tbody id="checksTable"></tbody>
+            </table>
+          </div>
+          <p class="technical-note">以航空公司、起降時間、飛行時間及轉機數配對班次。圖表空缺表示該輪無報價；航線最低價可能來自不同班次。報價與行李條件以訂票頁面為準。</p>
+        </details>
+      </footer>
+    </main>
+
+    <dialog id="rawDialog">
+      <div class="dialog-header">
+        <h2>原始資料</h2>
+        <button class="button" id="closeDialog" type="button">關閉</button>
+      </div>
+      <pre id="rawText"></pre>
+    </dialog>
+  </body>
+</html>
