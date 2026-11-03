@@ -125,9 +125,11 @@ function drawTable() {
   $("tableEmpty").hidden = flights.length > 0;
   $("flightTable").innerHTML = flights.map((flight) => {
     const index = state.flights.indexOf(flight);
-    const change = flight.change;
-    const changeText = change == null ? "—" : change === 0 ? "持平" :
-      `${change < 0 ? "↓" : "↑"} ${money(Math.abs(change))}`;
+    const change = flight.price != null && flight.history_min != null
+      ? flight.price - flight.history_min
+      : null;
+    const changeText = change == null ? "—" :
+      `${change > 0 ? "+" : change < 0 ? "-" : ""}${money(Math.abs(change))}`;
     const changeClass = change == null || change === 0 ? "muted" :
       change < 0 ? "positive" : "negative";
     const arrivalDay = flight.arrival_day_offset
@@ -141,7 +143,6 @@ function drawTable() {
       <tr class="${flight.key === selectedFlight ? "selected" : ""}">
         <td><button class="airline-button" data-flight="${index}" type="button">${escapeHtml(flight.airline)}</button></td>
         <td class="flight-time">${escapeHtml(flight.departure_time)} <small>→</small> ${escapeHtml(flight.arrival_time)} ${arrivalDay}</td>
-        <td>${duration} <span class="muted">· ${stops}</span></td>
         <td><span class="${flight.price == null ? "muted" : "price"}">${flight.price == null ? "無報價" : money(flight.price)}</span>${badge}</td>
         <td class="${changeClass}">${changeText}</td>
         <td>${money(flight.history_min)}</td>
@@ -249,7 +250,7 @@ function render() {
   $("lastTime").textContent = timeFormat.format(new Date(data.checked_at));
   $("lastDate").textContent = dayFormat.format(new Date(data.checked_at));
   $("historyCount").textContent = `${state.totals.checks} 次觀測`;
-  $("comparisonTime").textContent = state.previous_time ? `比較 ${formatDate(state.previous_time)} 的同一班次` : "";
+  $("comparisonTime").textContent = "差額＝最新票價 − 同一班次的區間最低價";
   drawChart($("routeChart"), state.history);
 
   if (!state.series.some((series) => series.key === selectedFlight)) {

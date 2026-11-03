@@ -143,7 +143,6 @@ function drawTable() {
       <tr class="${flight.key === selectedFlight ? "selected" : ""}">
         <td><button class="airline-button" data-flight="${index}" type="button">${escapeHtml(flight.airline)}</button></td>
         <td class="flight-time">${escapeHtml(flight.departure_time)} <small>→</small> ${escapeHtml(flight.arrival_time)} ${arrivalDay}</td>
-        <td>${duration} <span class="muted">· ${stops}</span></td>
         <td><span class="${flight.price == null ? "muted" : "price"}">${flight.price == null ? "無報價" : money(flight.price)}</span>${badge}</td>
         <td class="${changeClass}">${changeText}</td>
         <td>${money(flight.history_min)}</td>
