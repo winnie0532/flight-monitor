@@ -3,6 +3,7 @@
 let state = null;
 let selectedFlight = null;
 let loading = false;
+const staticMode = document.documentElement.dataset.source === "json";
 
 const $ = (id) => document.getElementById(id);
 const escapeHtml = (value) => String(value ?? "").replace(
@@ -146,7 +147,6 @@ function drawTable() {
         <td><span class="${flight.price == null ? "muted" : "price"}">${flight.price == null ? "無報價" : money(flight.price)}</span>${badge}</td>
         <td class="${changeClass}">${changeText}</td>
         <td>${money(flight.history_min)}</td>
-        <td><button class="detail-button" data-raw="${index}" type="button">原文</button></td>
       </tr>`;
   }).join("");
 }
@@ -220,7 +220,7 @@ function render() {
   try { config = JSON.parse(attempt.config_json); } catch { /* 以預設間隔判斷更新狀態。 */ }
   const overdue = Date.now() - Date.parse(attempt.checked_at) >
     Math.max(2 * (config.interval_seconds || 3600) + 120, 600) * 1000;
-  setConnection(overdue ? "尚未更新" : attempt.status === "error" ? "查詢失敗" : "已上傳資料",
+  setConnection(overdue ? "尚未更新" : attempt.status === "error" ? "查詢失敗" : staticMode ? "已上傳資料" : "本機資料",
     overdue || attempt.status === "error");
 
   const notes = [];
@@ -263,7 +263,6 @@ function render() {
   drawFlight();
   drawChecks();
 }
-
 
 let snapshotCache = null;
 
@@ -316,7 +315,14 @@ async function refresh() {
       duration: $("duration").value,
     });
     if (state && $("route").value !== "") params.set("route", $("route").value);
-    const data = await loadSnapshot(params);
+    let data;
+    if (staticMode) {
+      data = await loadSnapshot(params);
+    } else {
+      const response = await fetch(`/api/data?${params}`, { cache: "no-store" });
+      data = await response.json();
+      if (!response.ok) throw new Error(data.error || "讀取失敗");
+    }
     state = data;
     render();
   } catch (error) {
@@ -348,11 +354,7 @@ $("flightTable").addEventListener("click", (event) => {
     selectedFlight = state.flights[Number(button.dataset.flight)].key;
     $("flightSelect").value = state.series.findIndex((series) => series.key === selectedFlight);
     drawFlight();
-  } else {
-    $("rawText").textContent = state.flights[Number(button.dataset.raw)].raw_text;
-    $("rawDialog").showModal();
   }
 });
-$("closeDialog").addEventListener("click", () => $("rawDialog").close());
 refresh();
 setInterval(refresh, 60000);

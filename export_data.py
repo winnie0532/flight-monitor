@@ -61,6 +61,24 @@ def write_json(path, value):
             os.unlink(name)
 
 
+def sync_frontend(site_root):
+    source = ROOT / 'frontend'
+    names = ('dashboard.html', 'dashboard.js', 'dashboard.css')
+    contents = {name: (source / name).read_bytes() for name in names}
+    html = contents['dashboard.html'].decode('utf-8')
+    marker = 'data-source="api"'
+    if marker not in html:
+        raise ValueError('共用 HTML 缺少 API 模式標記')
+    site_root.mkdir(parents=True, exist_ok=True)
+    assets = site_root / 'frontend'
+    assets.mkdir(parents=True, exist_ok=True)
+    (site_root / 'index.html').write_text(
+        html.replace(marker, 'data-source="json"', 1), encoding='utf-8')
+    for name in ('dashboard.js', 'dashboard.css'):
+        (assets / name).write_bytes(contents[name])
+    (site_root / '.nojekyll').touch()
+
+
 def export(database, output):
     database = Path(database).resolve()
     output = Path(output).resolve()
@@ -93,6 +111,7 @@ def export(database, output):
             'routes': routes,
             'files': files,
         })
+    sync_frontend(output.parent)
     return len(routes)
 
 

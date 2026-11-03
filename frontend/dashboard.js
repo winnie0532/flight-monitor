@@ -3,6 +3,7 @@
 let state = null;
 let selectedFlight = null;
 let loading = false;
+const staticMode = document.documentElement.dataset.source === "json";
 
 const $ = (id) => document.getElementById(id);
 const escapeHtml = (value) => String(value ?? "").replace(
@@ -219,7 +220,7 @@ function render() {
   try { config = JSON.parse(attempt.config_json); } catch { /* 以預設間隔判斷更新狀態。 */ }
   const overdue = Date.now() - Date.parse(attempt.checked_at) >
     Math.max(2 * (config.interval_seconds || 3600) + 120, 600) * 1000;
-  setConnection(overdue ? "尚未更新" : attempt.status === "error" ? "查詢失敗" : "本機資料",
+  setConnection(overdue ? "尚未更新" : attempt.status === "error" ? "查詢失敗" : staticMode ? "已上傳資料" : "本機資料",
     overdue || attempt.status === "error");
 
   const notes = [];
@@ -263,6 +264,46 @@ function render() {
   drawChecks();
 }
 
+let snapshotCache = null;
+
+async function loadSnapshot(params) {
+  const metaResponse = await fetch(new URL("data/meta.json", document.baseURI), { cache: "no-store" });
+  if (!metaResponse.ok) throw new Error("尚未匯出資料，請先執行 export_data.py");
+  const meta = await metaResponse.json();
+  if (!meta.routes.length) return { routes: [], flights: [], history: [], series: [], checks: [] };
+
+  let routeIndex = params.has("route") ? Number(params.get("route")) : meta.routes.length - 1;
+  if (state?.routes?.length && params.has("route")) {
+    const selected = state.routes[routeIndex];
+    if (selected) {
+      const match = meta.routes.findIndex((route) => ["origin", "destination", "departure_date", "return_date", "currency"]
+        .every((field) => route[field] === selected[field]));
+      if (match >= 0) routeIndex = match;
+    }
+  }
+  if (!Number.isInteger(routeIndex) || routeIndex < 0 || routeIndex >= meta.routes.length) {
+    routeIndex = meta.routes.length - 1;
+  }
+
+  const filename = meta.files[routeIndex];
+  const cacheKey = `${meta.exported_at}|${filename}`;
+  if (!snapshotCache || snapshotCache.key !== cacheKey) {
+    const url = new URL(`data/${filename}`, document.baseURI);
+    url.searchParams.set("v", meta.exported_at);
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) throw new Error("無法讀取航線資料");
+    const bundle = await response.json();
+    if (bundle.exported_at !== meta.exported_at) throw new Error("網頁資料正在更新，稍後會自動重試");
+    snapshotCache = { key: cacheKey, bundle };
+  }
+
+  const key = `${params.get("nonstop")}|${params.get("duration") || "all"}|${params.get("hours")}`;
+  const view = snapshotCache.bundle.views[key];
+  if (!view) throw new Error("找不到對應的篩選資料");
+  $("exportTime").textContent = `資料匯出 ${formatDate(meta.exported_at)}`;
+  return { ...view, routes: meta.routes, route_index: routeIndex };
+}
+
 async function refresh() {
   if (loading) return;
   loading = true;
@@ -274,9 +315,14 @@ async function refresh() {
       duration: $("duration").value,
     });
     if (state && $("route").value !== "") params.set("route", $("route").value);
-    const response = await fetch(`/api/data?${params}`);
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "讀取失敗");
+    let data;
+    if (staticMode) {
+      data = await loadSnapshot(params);
+    } else {
+      const response = await fetch(`/api/data?${params}`, { cache: "no-store" });
+      data = await response.json();
+      if (!response.ok) throw new Error(data.error || "讀取失敗");
+    }
     state = data;
     render();
   } catch (error) {
@@ -308,11 +354,7 @@ $("flightTable").addEventListener("click", (event) => {
     selectedFlight = state.flights[Number(button.dataset.flight)].key;
     $("flightSelect").value = state.series.findIndex((series) => series.key === selectedFlight);
     drawFlight();
-  } else {
-    $("rawText").textContent = state.flights[Number(button.dataset.raw)].raw_text;
-    $("rawDialog").showModal();
   }
 });
-$("closeDialog").addEventListener("click", () => $("rawDialog").close());
 refresh();
 setInterval(refresh, 60000);

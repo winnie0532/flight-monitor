@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-Hant">
+<html lang="zh-Hant" data-source="json">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -123,8 +123,9 @@
 
       <footer class="page-footer">
         <div class="footer-meta">
-          <span>臺北時間 · TWD <span id="exportTime"></span></span>
+          <span>臺北時間 · TWD</span>
           <span id="renderTime"></span>
+          <span id="exportTime"></span>
         </div>
         <div id="alerts" class="status-notes" aria-live="polite"></div>
         <details class="collection-details">
@@ -140,12 +141,5 @@
       </footer>
     </main>
 
-    <dialog id="rawDialog">
-      <div class="dialog-header">
-        <h2>原始資料</h2>
-        <button class="button" id="closeDialog" type="button">關閉</button>
-      </div>
-      <pre id="rawText"></pre>
-    </dialog>
   </body>
 </html>
