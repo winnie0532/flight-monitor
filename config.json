@@ -40,6 +40,30 @@
     },
     {
       "origin": "TPE",
+      "destination": "BKK",
+      "departure_date": "2027-04-28",
+      "return_date": null
+    },
+    {
+      "origin": "TPE",
+      "destination": "BKK",
+      "departure_date": "2027-04-29",
+      "return_date": null
+    },
+    {
+      "origin": "TPE",
+      "destination": "DMK",
+      "departure_date": "2027-04-28",
+      "return_date": null
+    },
+    {
+      "origin": "TPE",
+      "destination": "DMK",
+      "departure_date": "2027-04-29",
+      "return_date": null
+    },
+    {
+      "origin": "TPE",
       "destination": "SIN",
       "departure_date": "2027-04-28",
       "return_date": null
