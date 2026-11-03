@@ -70,7 +70,7 @@ h2 { font-size: 14px; font-weight: 600; }
 .route-heading p { margin-top: 7px; color: var(--muted); font-size: 12px; letter-spacing: .6px; min-height: 19px; }
 
 /* 篩選 */
-.filters { display: grid; grid-template-columns: minmax(220px, 1fr) 160px 145px auto; align-items: end; gap: 17px; margin-bottom: 22px; }
+.filters { display: grid; grid-template-columns: minmax(220px, 1fr) 160px auto; align-items: end; gap: 17px; margin-bottom: 22px; }
 .field { display: grid; gap: 6px; min-width: 0; }
 .field label { font-size: 11px; color: var(--muted); }
 .field select, .search, .flight-select { border: 1px solid #e8dfe2; border-radius: 9px; color: var(--text); background: var(--surface); min-width: 0; }
@@ -149,7 +149,7 @@ dialog pre { margin: 18px 0 0; padding: 16px; border-radius: 9px; background: #f
 /* 小螢幕 */
 @media (max-width: 1000px) {
   .dashboard { padding: 22px 24px; }
-  .filters { grid-template-columns: minmax(180px, 1fr) 135px 125px auto; gap: 12px; }
+  .filters { grid-template-columns: minmax(180px, 1fr) 135px auto; gap: 12px; }
   .metrics { gap: 11px; }
   .metric-card { padding: 17px; }
   .metric-value { font-size: 26px; }

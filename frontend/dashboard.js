@@ -312,7 +312,7 @@ async function refresh() {
     const params = new URLSearchParams({
       hours: $("hours").value,
       nonstop: $("nonstop").checked ? "1" : "0",
-      duration: $("duration").value,
+      duration: "",
     });
     if (state && $("route").value !== "") params.set("route", $("route").value);
     let data;
@@ -335,7 +335,7 @@ async function refresh() {
 }
 
 $("refresh").addEventListener("click", refresh);
-for (const id of ["route", "hours", "duration", "nonstop"]) {
+for (const id of ["route", "hours", "nonstop"]) {
   $(id).addEventListener("change", () => {
     selectedFlight = null;
     refresh();
