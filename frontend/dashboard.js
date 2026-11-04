@@ -294,6 +294,100 @@ function render() {
 
 let snapshotCache = null;
 
+
+function filterSnapshot(data, params) {
+  const hours = Number(params.get("hours") || 0);
+  const nonstop = params.get("nonstop") === "1";
+
+  // 以最新一次查詢時間作為區間終點
+  const latestTime = Date.parse(data.latest_attempt?.checked_at || "");
+  const cutoff = hours > 0 && Number.isFinite(latestTime)
+    ? latestTime - hours * 60 * 60 * 1000
+    : -Infinity;
+
+  const inRange = (point) =>
+    cutoff === -Infinity || Date.parse(point.time) >= cutoff;
+
+  // 依照轉機條件及時間範圍篩選航班歷史
+  const series = (data.series || [])
+    .filter((item) => {
+      try {
+        const stops = JSON.parse(item.key)[5];
+        return !nonstop || stops === 0;
+      } catch {
+        return false;
+      }
+    })
+    .map((item) => ({
+      ...item,
+      points: (item.points || []).filter(inRange),
+    }));
+
+  // 整理各時間點的有效票價
+  const pricesByTime = new Map();
+
+  for (const item of series) {
+    for (const point of item.points) {
+      if (!isValidPrice(point.price)) continue;
+
+      if (!pricesByTime.has(point.time)) {
+        pricesByTime.set(point.time, []);
+      }
+
+      pricesByTime.get(point.time).push(Number(point.price));
+    }
+  }
+
+  // 重新計算每輪最低票價
+  const history = (data.history || [])
+    .filter(inRange)
+    .map((check) => {
+      const prices = pricesByTime.get(check.time) || [];
+
+      return {
+        ...check,
+        price: prices.length ? Math.min(...prices) : null,
+        count: prices.length,
+      };
+    });
+
+  // 重新計算各航班在選取區間內的歷史最低價
+  const seriesByKey = new Map(
+    series.map((item) => [item.key, item])
+  );
+
+  const flights = (data.flights || [])
+    .filter((flight) => !nonstop || flight.stops === 0)
+    .map((flight) => {
+      const points = seriesByKey.get(flight.key)?.points || [];
+      const prices = points
+        .filter((point) => isValidPrice(point.price))
+        .map((point) => Number(point.price));
+
+      return {
+        ...flight,
+        history_min: prices.length ? Math.min(...prices) : null,
+      };
+    });
+
+  const checks = (data.checks || [])
+    .filter((check) => inRange({ time: check.checked_at }))
+    .slice(0, 30);
+
+  return {
+    ...data,
+    flights,
+    history,
+    series,
+    checks,
+    totals: {
+      ...data.totals,
+      checks: history.length,
+    },
+  };
+}
+
+
 async function loadSnapshot(params) {
   const metaResponse = await fetch(new URL("data/meta.json", document.baseURI), { cache: "no-store" });
   if (!metaResponse.ok) throw new Error("尚未匯出資料，請先執行 export_data.py");
@@ -325,11 +419,21 @@ async function loadSnapshot(params) {
     snapshotCache = { key: cacheKey, bundle };
   }
 
-  const key = `${params.get("nonstop")}|${params.get("duration") || "all"}|${params.get("hours")}`;
-  const view = snapshotCache.bundle.views[key];
-  if (!view) throw new Error("找不到對應的篩選資料");
-  $("exportTime").textContent = `資料匯出 ${formatDate(meta.exported_at)}`;
-  return { ...view, routes: meta.routes, route_index: routeIndex };
+    const data = snapshotCache.bundle.data;
+
+    if (!data) {
+      throw new Error("航線 JSON 格式錯誤，找不到 data");
+    }
+
+    $("exportTime").textContent = `資料匯出 ${formatDate(meta.exported_at)}`;
+
+    const filtered = filterSnapshot(data, params);
+
+    return {
+      ...filtered,
+      routes: meta.routes,
+      route_index: routeIndex,
+    };
 }
 
 async function refresh() {

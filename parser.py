@@ -1,6 +1,7 @@
 """解析英文 Google Flights 卡片，不進行歷史比價。"""
 from datetime import datetime
 from decimal import Decimal
+from email.mime import text
 import re
 
 def parse_price(text):
@@ -47,7 +48,12 @@ def parse_flight(raw_text):
         minutes = int(duration.group(2) or 0)
         duration_minutes = hours * 60 + minutes
 
-    stop_match = re.search(r"\b(\d+)\s+stops?\b", text, re.I)
+    # 轉機次數必須出現在獨立文字行，避免誤讀價格尾數
+    stop_match = re.search(
+        r"(?:^|\n)[ \t]*(\d+)[ \t]+stops?\b",
+        text,
+        re.I,
+    )
     stops = (
         0 if re.search(r"\bNonstop\b", text, re.I)
         else int(stop_match.group(1)) if stop_match

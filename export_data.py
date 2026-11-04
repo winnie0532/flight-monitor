@@ -99,20 +99,35 @@ def export(database, output):
         routes = initial['routes']
         files = []
         for index in range(len(routes)):
-            views = {}
-            for nonstop in (0, 1):
-                for hours in (0, 24, 168):
-                    key = f'{nonstop}|all|{hours}'
-                    view = read_data(snapshot, index, bool(nonstop), None, hours)
-                    views[key] = public_view(view)
+            # 每條航線只讀取一次，匯出完整歷史、不限轉機
+            view = read_data(
+                snapshot,
+                route_index=index,
+                nonstop=False,
+                max_duration=None,
+                hours=0,
+            )
+
             name = f'route-{index}.json'
-            write_json(output / name, {'exported_at': timestamp, 'views': views})
+
+            write_json(
+                output / name,
+                {
+                    'exported_at': timestamp,
+                    'data': public_view(view),
+                },
+            )
+
             files.append(name)
         write_json(output / 'meta.json', {
             'exported_at': timestamp,
             'routes': routes,
             'files': files,
         })
+        # 清除本次匯出未使用的舊航線 JSON
+        for old_file in output.glob('route-*.json'):
+            if old_file.name not in files:
+                old_file.unlink()
     sync_frontend(output.parent)
     return len(routes)
 

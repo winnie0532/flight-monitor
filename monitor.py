@@ -66,12 +66,22 @@ def main():
 
     logger = logging.getLogger("flight_monitor")
     logger.setLevel(logging.INFO)
+    logger.propagate = False
+
+    # 避免重複註冊相同的檔案 Handler
+    for old_handler in logger.handlers[:]:
+        if isinstance(old_handler, TimedRotatingFileHandler):
+            old_handler.close()
+            logger.removeHandler(old_handler)
+
     logger.addHandler(handler)
 
     class LogStream:
-        def __init__(self, terminal, level):
+        def __init__(self, terminal, level, logger, handler):
             self.terminal = terminal
             self.level = level
+            self.logger = logger
+            self.handler = handler
             self.buffer = ""
 
         def write(self, text):
@@ -81,16 +91,24 @@ def main():
             while "\n" in self.buffer:
                 line, self.buffer = self.buffer.split("\n", 1)
                 if line.strip():
-                    logger.log(self.level, line)
+                    self.logger.log(self.level, line)
 
             return len(text)
 
         def flush(self):
-            self.terminal.flush()
-            handler.flush()
+            # 將尚未換行的最後一段文字寫入 Log
+            if self.buffer.strip():
+                self.logger.log(self.level, self.buffer)
+            self.buffer = ""
 
-    sys.stdout = LogStream(sys.stdout, logging.INFO)
-    sys.stderr = LogStream(sys.stderr, logging.ERROR)
+            self.terminal.flush()
+            self.handler.flush()
+
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+
+    sys.stdout = LogStream(original_stdout, logging.INFO, logger, handler)
+    sys.stderr = LogStream(original_stderr, logging.ERROR, logger, handler)
 
     logger.info("資料收集程式啟動")
     if args.pause and (not args.headed or args.watch):

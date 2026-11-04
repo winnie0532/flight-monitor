@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import sqlite3
+from contextlib import closing
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS checks (
@@ -73,18 +74,30 @@ def reset_database(database):
     """明確指定重建時先備份，避免誤刪歷史。"""
     database = Path(database)
     backup = None
+
     if database.exists():
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-        backup = database.with_name(f"{database.stem}.backup-{stamp}{database.suffix}")
-        with sqlite3.connect(database) as source, sqlite3.connect(backup) as target:
-            source.backup(target)
-        with sqlite3.connect(database) as connection:
+        backup = database.with_name(
+            f"{database.stem}.backup-{stamp}{database.suffix}"
+        )
+
+        # 備份資料庫，完成後確實關閉兩個連線
+        with closing(sqlite3.connect(database)) as source, source:
+            with closing(sqlite3.connect(backup)) as target, target:
+                source.backup(target)
+
+        # 清除舊資料表，完成後確實關閉連線
+        with closing(sqlite3.connect(database)) as connection, connection:
             connection.execute("BEGIN IMMEDIATE")
+
             for name in ("flight_prices", "checks"):
                 connection.execute(f'DROP TABLE IF EXISTS "{name}"')
+
             connection.execute("PRAGMA user_version=0")
+
     connection = connect(database)
     connection.close()
+
     return backup
 
 

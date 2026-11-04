@@ -168,9 +168,22 @@ def make_handler(database):
                 self.end_headers()
                 self.wfile.write(payload)
             except Exception as exc:
-                payload=json.dumps({'error':str(exc)},ensure_ascii=False).encode()
-                self.send_response(400)
-                self.send_header('Content-Type','application/json; charset=utf-8')
+                payload = json.dumps(
+                    {'error': str(exc)},
+                    ensure_ascii=False,
+                ).encode()
+
+                # 使用者輸入或篩選條件錯誤
+                if isinstance(exc, ValueError):
+                    status_code = 400
+                else:
+                    # 資料庫或伺服器內部錯誤
+                    status_code = 500
+
+                self.send_response(status_code)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_header('Cache-Control', 'no-store')
+                self.send_header('X-Content-Type-Options', 'nosniff')
                 self.end_headers()
                 self.wfile.write(payload)
         def log_message(self,*args):
