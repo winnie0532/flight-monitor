@@ -12,11 +12,15 @@ from dashboard import read_data
 
 ROOT = Path(__file__).resolve().parent
 PUBLIC_FLIGHT_FIELDS = (
-    'id', 'check_id', 'checked_at', 'origin', 'destination', 'departure_date',
-    'return_date', 'currency', 'price', 'price_status', 'airline',
-    'departure_time', 'arrival_time', 'arrival_day_offset', 'duration_minutes',
-    'stops', 'key', 'change', 'previous_time', 'history_min', 'history_max',
-    'observations', 'raw_text',
+    'price',
+    'airline',
+    'departure_time',
+    'arrival_time',
+    'arrival_day_offset',
+    'duration_minutes',
+    'stops',
+    'key',
+    'history_min',
 )
 
 
@@ -43,7 +47,6 @@ def public_view(view):
         'checks': [public_check(check) for check in view['checks']],
         'excluded': view.get('excluded', 0),
         'totals': view.get('totals', {'checks': len(view['checks']), 'observations': 0}),
-        'previous_time': view.get('previous_time'),
     }
     return result
 
@@ -98,11 +101,10 @@ def export(database, output):
         for index in range(len(routes)):
             views = {}
             for nonstop in (0, 1):
-                for duration in (None, 240, 360):
-                    for hours in (0, 24, 168):
-                        key = f'{nonstop}|{duration or "all"}|{hours}'
-                        view = read_data(snapshot, index, bool(nonstop), duration, hours)
-                        views[key] = public_view(view)
+                for hours in (0, 24, 168):
+                    key = f'{nonstop}|all|{hours}'
+                    view = read_data(snapshot, index, bool(nonstop), None, hours)
+                    views[key] = public_view(view)
             name = f'route-{index}.json'
             write_json(output / name, {'exported_at': timestamp, 'views': views})
             files.append(name)

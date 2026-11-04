@@ -50,7 +50,7 @@ h2 { font-size: 14px; font-weight: 600; }
 
 /* 頁面 */
 .dashboard { width: min(1360px, 100%); margin: 0 auto; padding: 26px 36px 30px; }
-.page-header, .header-actions, .panel-header, .footer-meta, .dialog-header {
+.page-header, .header-actions, .panel-header, .footer-meta {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -107,10 +107,9 @@ th, td { padding: 12px 19px; }
 td { font-size: 12px; border-bottom: 1px solid #f2ebee; }
 tr:last-child td { border-bottom: none; }
 tbody tr:hover, tbody tr.selected { background: #fff5f8; }
-.airline-button, .detail-button { background: none; border: none; padding: 0; text-align: left; }
+.airline-button { background: none; border: none; padding: 0; text-align: left; }
 .airline-button { color: var(--text); font-size: 12px; font-weight: 600; }
 .airline-button:hover { color: var(--accent); }
-.detail-button { color: var(--muted); font-size: 10px; }
 .flight-time { font-variant-numeric: tabular-nums; }
 .flight-time small { font-size: 10px; color: var(--muted); }
 .price { font-weight: 650; font-size: 14px; font-variant-numeric: tabular-nums; }
@@ -142,9 +141,6 @@ tbody tr:hover, tbody tr.selected { background: #fff5f8; }
 .collection-details .table-scroll { max-height: 230px; margin-top: 9px; border: 1px solid var(--border); border-radius: 9px; }
 .collection-details th, .collection-details td { padding: 9px 12px; font-size: 10px; }
 .technical-note { margin-top: 9px; line-height: 1.8; }
-dialog { border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; width: min(650px, 90%); max-height: 80vh; color: var(--text); background: var(--surface); }
-dialog::backdrop { background: #60455355; }
-dialog pre { margin: 18px 0 0; padding: 16px; border-radius: 9px; background: #fff6f3; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.8 Consolas, monospace; }
 
 /* 小螢幕 */
 @media (max-width: 1000px) {

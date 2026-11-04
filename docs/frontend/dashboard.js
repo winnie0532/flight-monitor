@@ -16,6 +16,8 @@ const escapeHtml = (value) => String(value ?? "").replace(
 const money = (value) => value == null
   ? "—"
   : `NT$${Number(value).toLocaleString("zh-TW")}`;
+const isValidPrice = (value) =>
+  Number.isFinite(Number(value)) && Number(value) > 0;
 
 const dateFormat = new Intl.DateTimeFormat("zh-TW", {
   timeZone: "Asia/Taipei", month: "2-digit", day: "2-digit",
@@ -41,7 +43,7 @@ function setConnection(text, warning = false) {
 }
 
 function drawChart(element, points) {
-  const available = points.filter((point) => point.price != null);
+  const available = points.filter((point) => isValidPrice(point.price));
   if (!available.length) {
     element.innerHTML = '<div class="empty-state">尚無報價</div>';
     return;
@@ -90,7 +92,7 @@ function drawChart(element, points) {
   };
 
   for (const point of points) {
-    if (point.price == null) {
+    if (!isValidPrice(point.price)) {
       finishSegment();
     } else {
       segment.push(`${x(point)},${y(point.price)}`);
@@ -119,14 +121,16 @@ function drawChart(element, points) {
 function drawTable() {
   const query = $("search").value.trim().toLowerCase();
   const flights = state.flights.filter((flight) => (flight.airline || "").toLowerCase().includes(query));
-  const prices = state.flights.filter((flight) => flight.price != null).map((flight) => flight.price);
+  const prices = state.flights
+    .filter((flight) => isValidPrice(flight.price))
+    .map((flight) => Number(flight.price));
   const minimum = prices.length ? Math.min(...prices) : null;
 
   $("tableCount").textContent = `${flights.length} 班`;
   $("tableEmpty").hidden = flights.length > 0;
   $("flightTable").innerHTML = flights.map((flight) => {
     const index = state.flights.indexOf(flight);
-    const change = flight.price != null && flight.history_min != null
+    const change = isValidPrice(flight.price) && isValidPrice(flight.history_min)
       ? flight.price - flight.history_min
       : null;
     const changeText = change == null ? "—" :
@@ -137,16 +141,16 @@ function drawTable() {
       ? `<small>+${flight.arrival_day_offset}</small>` : "";
     const duration = `${Math.floor(flight.duration_minutes / 60)}h ${flight.duration_minutes % 60}m`;
     const stops = flight.stops === 0 ? "直飛" : `${flight.stops} 次轉機`;
-    const badge = minimum != null && flight.price === minimum
+    const badge = minimum != null && isValidPrice(flight.price) && Number(flight.price) === minimum
       ? '<span class="badge">最低</span>' : "";
 
     return `
       <tr class="${flight.key === selectedFlight ? "selected" : ""}">
         <td><button class="airline-button" data-flight="${index}" type="button">${escapeHtml(flight.airline)}</button></td>
         <td class="flight-time">${escapeHtml(flight.departure_time)} <small>→</small> ${escapeHtml(flight.arrival_time)} ${arrivalDay}</td>
-        <td><span class="${flight.price == null ? "muted" : "price"}">${flight.price == null ? "無報價" : money(flight.price)}</span>${badge}</td>
+        <td><span class="${isValidPrice(flight.price) ? "price" : "muted"}">${isValidPrice(flight.price) ? money(flight.price) : "無報價"}</span>${badge}</td>
         <td class="${changeClass}">${changeText}</td>
-        <td>${money(flight.history_min)}</td>
+        <td>${isValidPrice(flight.history_min) ? money(flight.history_min) : "—"}</td>
       </tr>`;
   }).join("");
 }
@@ -154,7 +158,9 @@ function drawTable() {
 function drawFlight() {
   const series = state.series.find((item) => item.key === selectedFlight);
   const points = series?.points || [];
-  const prices = points.filter((point) => point.price != null).map((point) => point.price);
+  const prices = points
+    .filter((point) => isValidPrice(point.price))
+    .map((point) => Number(point.price));
   drawChart($("flightChart"), points);
   $("flightRange").innerHTML = prices.length
     ? `<span>最低 <b>${money(Math.min(...prices))}</b></span><span>最高 <b>${money(Math.max(...prices))}</b></span>`
@@ -216,12 +222,32 @@ function render() {
 
   const attempt = state.latest_attempt;
   const data = state.latest_data;
+
   let config = {};
-  try { config = JSON.parse(attempt.config_json); } catch { /* 以預設間隔判斷更新狀態。 */ }
-  const overdue = Date.now() - Date.parse(attempt.checked_at) >
+  if (attempt?.config_json) {
+    try {
+      config = JSON.parse(attempt.config_json);
+    } catch {
+      // 使用預設更新間隔
+    }
+  }
+
+  const hasAttempt = Boolean(attempt?.checked_at);
+  const attemptTime = hasAttempt ? Date.parse(attempt.checked_at) : NaN;
+
+  const overdue = Number.isFinite(attemptTime) &&
+    Date.now() - attemptTime >
     Math.max(2 * (config.interval_seconds || 3600) + 120, 600) * 1000;
-  setConnection(overdue ? "尚未更新" : attempt.status === "error" ? "查詢失敗" : staticMode ? "已上傳資料" : "本機資料",
-    overdue || attempt.status === "error");
+
+  const hasError = attempt?.status === "error";
+
+  setConnection(
+    !hasAttempt ? "尚無收集紀錄" :
+    overdue ? "尚未更新" :
+    hasError ? "查詢失敗" :
+    staticMode ? "已上傳資料" : "本機資料",
+    !hasAttempt || overdue || hasError
+  );
 
   const notes = [];
   if (overdue) notes.push("資料尚未更新");
@@ -231,14 +257,16 @@ function render() {
     setNotes([...notes, "尚無航班資料"]);
     return;
   }
-  if (attempt.id !== data.id) notes.push(`顯示最近可用資料：${formatDate(data.checked_at)}`);
+  if (attempt && attempt.id !== data.id) {
+    notes.push(`顯示最近可用資料：${formatDate(data.checked_at)}`);
+  }
   if (state.excluded) notes.push(`${state.excluded} 筆資料未納入統計`);
   setNotes(notes);
 
-  const priced = state.flights.filter((flight) => flight.price != null && flight.price > 0);
-  const cheapest = priced.reduce((best, flight) => !best || flight.price < best.price ? flight : best, null);
-  const best = state.history.filter((point) => point.price != null).reduce(
-    (result, point) => !result || point.price < result.price ? point : result, null,
+  const priced = state.flights.filter((flight) => isValidPrice(flight.price));
+  const cheapest = priced.reduce((best, flight) => !best || Number(flight.price) < Number(best.price) ? flight : best, null);
+  const best = state.history.filter((point) => isValidPrice(point.price)).reduce(
+    (result, point) => !result || Number(point.price) < Number(result.price) ? point : result, null,
   );
 
   $("currentPrice").innerHTML = cheapest ? `<small>TWD</small>${Number(cheapest.price).toLocaleString("zh-TW")}` : "—";
@@ -249,7 +277,7 @@ function render() {
   $("quoteNote").textContent = `${state.flights.length - priced.length} 班無報價`;
   $("lastTime").textContent = timeFormat.format(new Date(data.checked_at));
   $("lastDate").textContent = dayFormat.format(new Date(data.checked_at));
-  $("historyCount").textContent = `${state.totals.checks} 次觀測`;
+  $("historyCount").textContent = `${state.totals?.checks ?? state.checks.length} 次觀測`;
   $("comparisonTime").textContent = "差額＝最新票價 − 同一班次的區間最低價";
   drawChart($("routeChart"), state.history);
 
@@ -319,12 +347,48 @@ async function refresh() {
     if (staticMode) {
       data = await loadSnapshot(params);
     } else {
-      const response = await fetch(`/api/data?${params}`, { cache: "no-store" });
-      data = await response.json();
-      if (!response.ok) throw new Error(data.error || "讀取失敗");
+      const response = await fetch(`/api/data?${params}`, {
+        cache: "no-store"
+      });
+
+      const responseText = await response.text();
+
+      let result;
+
+      try {
+        result = JSON.parse(responseText);
+      } catch {
+        throw new Error(
+          `API 回傳格式錯誤（HTTP ${response.status}）`
+        );
+      }
+
+      if (!response.ok) {
+        throw new Error(result.error || `HTTP ${response.status}`);
+      }
+
+      data = result;
     }
-    state = data;
-    render();
+    state = {
+    routes: [],
+    flights: [],
+    history: [],
+    series: [],
+    checks: [],
+    totals: { checks: 0, observations: 0 },
+    latest_attempt: null,
+    latest_data: null,
+    ...data,
+  };
+
+  state.routes ||= [];
+  state.flights ||= [];
+  state.history ||= [];
+  state.series ||= [];
+  state.checks ||= [];
+  state.totals ||= { checks: state.checks.length, observations: 0 };
+
+  render();
   } catch (error) {
     setConnection("更新失敗", true);
     setNotes([`更新失敗：${error.message}`, "畫面保留前次資料"]);
@@ -348,13 +412,24 @@ $("flightSelect").addEventListener("change", () => {
   drawFlight();
 });
 $("flightTable").addEventListener("click", (event) => {
-  const button = event.target.closest("[data-flight], [data-raw]");
+  const button = event.target.closest("[data-flight]");
+
   if (!button || !state) return;
-  if (button.dataset.flight !== undefined) {
-    selectedFlight = state.flights[Number(button.dataset.flight)].key;
-    $("flightSelect").value = state.series.findIndex((series) => series.key === selectedFlight);
-    drawFlight();
-  }
+
+  const flight = state.flights[Number(button.dataset.flight)];
+  if (!flight) return;
+
+  selectedFlight = flight.key;
+
+  $("flightSelect").value = state.series.findIndex(
+    (series) => series.key === selectedFlight
+  );
+
+  drawFlight();
 });
 refresh();
-setInterval(refresh, 60000);
+setInterval(() => {
+  if (!document.hidden) {
+    refresh();
+  }
+}, 300000);
