@@ -9,6 +9,7 @@ import sqlite3
 import tempfile
 
 from dashboard import read_data
+from config import load_config
 
 ROOT = Path(__file__).resolve().parent
 PUBLIC_FLIGHT_FIELDS = (
@@ -82,7 +83,7 @@ def sync_frontend(site_root):
     (site_root / '.nojekyll').touch()
 
 
-def export(database, output):
+def export(database, output, config_path):
     database = Path(database).resolve()
     output = Path(output).resolve()
     if not database.is_file():
@@ -95,20 +96,52 @@ def export(database, output):
             with closing(sqlite3.connect(snapshot)) as target:
                 source.backup(target)
                 target.commit()
+        config = load_config(config_path)
+        configured_routes = config['routes']
+
         initial = read_data(snapshot)
-        routes = initial['routes']
+        database_routes = initial['routes']
+
+        routes = []
+        route_indices = []
+
+        for route in configured_routes:
+            match = next(
+                (
+                    index
+                    for index, db_route in enumerate(database_routes)
+                    if all(
+                        db_route.get(field) == route.get(field)
+                        for field in (
+                            'origin',
+                            'destination',
+                            'departure_date',
+                            'return_date',
+                        )
+                    )
+                ),
+                None,
+            )
+
+            if match is None:
+                raise ValueError(
+                    f"資料庫找不到設定中的航線："
+                    f"{route['origin']} → {route['destination']} "
+                    f"{route['departure_date']}"
+                )
+
+            routes.append(database_routes[match])
+            route_indices.append(match)
         files = []
-        for index in range(len(routes)):
-            # 每條航線只讀取一次，匯出完整歷史、不限轉機
+        for output_index, database_index in enumerate(route_indices):
             view = read_data(
                 snapshot,
-                route_index=index,
+                route_index=database_index,
                 nonstop=False,
                 max_duration=None,
                 hours=0,
             )
-
-            name = f'route-{index}.json'
+            name = f'route-{output_index}.json'
 
             write_json(
                 output / name,
@@ -136,9 +169,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--database', type=Path, default=ROOT / 'data/collection.sqlite3')
     parser.add_argument('--output', type=Path, default=ROOT / 'docs/data')
+    parser.add_argument('--config', type=Path, default=ROOT / 'config.json')
     args = parser.parse_args()
     try:
-        count = export(args.database, args.output)
+        count = export(args.database, args.output, args.config)
     except Exception as error:
         parser.exit(1, f'匯出失敗：{error}\n')
     print(f'已匯出 {count} 組航線：{args.output.resolve()}')
