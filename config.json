@@ -15,24 +15,6 @@
       "return_date": null
     },
     {
-      "origin": "TPE",
-      "destination": "NRT",
-      "departure_date": "2027-03-01",
-      "return_date": null
-    },
-    {
-      "origin": "TPE",
-      "destination": "NRT",
-      "departure_date": "2027-03-02",
-      "return_date": null
-    },
-    {
-      "origin": "TPE",
-      "destination": "NRT",
-      "departure_date": "2027-03-03",
-      "return_date": null
-    },
-    {
       "origin": "NRT",
       "destination": "TPE",
       "departure_date": "2027-03-07",
